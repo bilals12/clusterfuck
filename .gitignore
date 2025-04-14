@@ -1,0 +1,5 @@
+aws-credentials.yaml
+bsssq-cert.pem
+analysis/
+deobfuscation-env/
+sealed-aws-credentials.yaml

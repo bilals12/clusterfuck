@@ -1,0 +1,101 @@
+# attack-sim-deploy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sim-pod
+  namespace: default
+  labels:
+    app: attack-sim
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/attack-sim: unconfined
+spec:
+  # Use default networking
+  containers:
+  - name: attack-sim
+    image: bilals12/attack-sim:latest
+    imagePullPolicy: IfNotPresent
+    # No command override - use the container's built-in ENTRYPOINT
+    securityContext:
+      privileged: true
+      capabilities:
+        add: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE", "ALL"]
+    env:
+    - name: PAYLOAD_SERVER
+      value: "payload-server.default.svc.cluster.local"
+    - name: PAYLOAD_SERVER_PORT
+      value: "8080"
+    - name: AWS_CREDENTIAL_PATH
+      value: "/etc/bsssq-secrets/aws"
+    - name: ENABLE_CLOUD_ENUMERATION
+      value: "true"
+    ports:
+    - containerPort: 22
+      hostPort: 2222
+    - containerPort: 4444
+      hostPort: 4444
+    - containerPort: 8080
+      hostPort: 8080
+    - containerPort: 7456
+      hostPort: 7456
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+    - name: host-fs
+      mountPath: /host
+    - name: run-systemd
+      mountPath: /run/systemd
+    - name: var-log
+      mountPath: /var/log
+    - name: aws-credentials
+      mountPath: /etc/bsssq-secrets/aws
+      readOnly: true
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+  - name: host-fs
+    hostPath:
+      path: /
+  - name: run-systemd
+    hostPath:
+      path: /run/systemd
+  - name: var-log
+    hostPath:
+      path: /var/log
+  - name: aws-credentials
+    secret:
+      secretName: aws-credentials
+      optional: true
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payload-access
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: attack-sim
+  policyTypes:
+  - Egress
+  - Ingress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: payload-server
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to: []  # Allow all outbound traffic
+  ingress:
+  - from: []  # Allow all inbound traffic
+    ports:
+    - protocol: TCP
+      port: 22
+    - protocol: TCP
+      port: 4444
+    - protocol: TCP
+      port: 7456
+    - protocol: TCP
+      port: 8080
