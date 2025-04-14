@@ -6,7 +6,7 @@ an attack environment for simulating realistic attack vectors against Kubernetes
 ![Security Testing](https://img.shields.io/badge/Security-Testing-blue)
 ![Purple Team](https://img.shields.io/badge/Purple-Team-purple)
 
-## overview
+# overview
 
 clusterfuck simulates advanced container escape and privilege escalation techniques commonly used by attackers targeting Kubernetes environments. The toolkit allows security teams to:
 
@@ -15,24 +15,24 @@ clusterfuck simulates advanced container escape and privilege escalation techniq
 - test incident response procedures
 - conduct purple team exercises
 
-## key features
+# key features
 
-- **Container Escape Techniques**: Simulates privileged container attacks with host filesystem access
-- **Credential Exfiltration**: Extracts and exfiltrates Kubernetes service account tokens
-- **Network Reconnaissance**: Performs port scanning and network mapping 
-- **Persistence Mechanisms**: Demonstrates common persistence techniques including cron jobs
-- **Command & Control**: Establishes reverse shell connections to a simulated C2 server
-- **Payload Delivery**: Includes a full payload server for realistic attack simulation
-- **Cloud Credential Theft**: Simulates AWS credential theft (with dummy credentials)
-- **Process Hiding**: Demonstrates anti-forensics techniques
+- **container dscape techniques**: eimulates privileged container attacks with host filesystem access
+- **credential exfiltration**: extracts and exfiltrates Kubernetes service account tokens
+- **network reconnaissance**: performs port scanning and network mapping 
+- **persistence mechanisms**: demonstrates common persistence techniques including cron jobs
+- **command & control**: establishes reverse shell connections to a simulated C2 server
+- **payload delivery**: includes a full payload server for realistic attack simulation
+- **cloud credential theft**: simulates AWS credential theft (with dummy or real credentials)
+- **process hiding**: demonstrates anti-forensics techniques
 
-## prerequisites
+# prerequisites
 
 - kubernetes cluster (minikube, kind, EKS, GKE, etc.)
 - `kubectl` configured with appropriate permissions
 - basic understanding of Kubernetes security concepts
 
-## quick start
+# quick start
 
 for a minimal setup that demonstrates key attack paths:
 
