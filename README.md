@@ -37,16 +37,16 @@ clusterfuck simulates advanced container escape and privilege escalation techniq
 for a minimal setup that demonstrates key attack paths:
 
 ```bash
-# Deploy the payload server (C2 simulation)
+# deploy the payload server (C2 simulation)
 kubectl apply -f payload-server.yaml
 
-# Deploy the attack simulation pod
+# deploy the attack simulation pod
 kubectl apply -f attack-sim-deploy.yaml
 
-# Watch the attack simulation logs
+# watch the attack simulation logs
 kubectl logs -f sim-pod
 
-# View captured data on the payload server
+# view captured data on the payload server
 kubectl logs -f $(kubectl get pods -l app=payload-server -o name | head -n1)
 ```
 
