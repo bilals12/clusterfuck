@@ -2,16 +2,16 @@ FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Etc/UTC \
-    PAYLOAD_SERVER="payload-server.default.svc.cluster.local" \
+    PAYLOAD_SERVER="payload-server.bilal.svc.cluster.local" \
     PAYLOAD_PORT="8080" \
     AWS_CREDENTIAL_PATH="/etc/bsssq-secrets/aws" \
     MINER_DURATION="60"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        tar python3 python3-pip curl wget netcat \
+        tar python3 python3-pip curl wget netcat unzip \
         iproute2 dnsutils ca-certificates && \
-    pip3 install --no-cache-dir requests && \
+    pip3 install --no-cache-dir requests awscli && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY sim.tar /

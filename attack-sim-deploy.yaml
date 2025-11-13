@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: sim-pod
-  namespace: default
+  namespace: bilal
   labels:
     app: attack-sim
   annotations:
@@ -10,15 +10,15 @@ metadata:
 spec:
   containers:
   - name: attack-sim
-    image: bilals12/attack-sim:latest
-    imagePullPolicy: IfNotPresent
+    image: bilals12/attack-sim@sha256:a78f4e467b9b703fbbb13e1c1ac5e1ee59450ed8e811b3e4a9989528bf163938
+    imagePullPolicy: Always
     securityContext:
       privileged: true
       capabilities:
         add: ["NET_ADMIN", "SYS_ADMIN", "SYS_PTRACE", "ALL"]
     env:
     - name: PAYLOAD_SERVER
-      value: "payload-server.default.svc.cluster.local"
+      value: "payload-server.bilal.svc.cluster.local"
     - name: PAYLOAD_PORT
       value: "8080"
     - name: AWS_CREDENTIAL_PATH
@@ -49,28 +49,3 @@ spec:
     secret:
       secretName: aws-credentials
       optional: true
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-payload-access
-  namespace: default
-spec:
-  podSelector:
-    matchLabels:
-      app: attack-sim
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: payload-server
-    ports:
-    - protocol: TCP
-      port: 8080
-  - to:
-    - namespaceSelector: {}
-    ports:
-    - protocol: TCP
-      port: 53

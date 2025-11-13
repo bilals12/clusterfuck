@@ -1,0 +1,10 @@
+[1;33m[22:06:27]   [2025-11-11 22:06:19[1;30m.653[0m] [0;31m[44;1m[1;37m net     [0m [1;36mxmr.gntl.uk[0m [0;31mread error: [0m[1;31m"end of file"[0m[0m[0m
+[1;33m[22:06:27]   [2025-11-11 22:06:25[1;30m.659[0m] [0;31m[44;1m[1;37m net     [0m [1;36mxmr.gntl.uk[0m [0;31mread error: [0m[1;31m"end of file"[0m[0m[0m
+[0;32m[22:06:27] ✓ Python miner complete[0m
+[0;34m[22:06:27] Stage 11: Anti-forensics[0m
+[1;33m[22:06:27]   - Clearing bash history...[0m
+[1;33m[22:06:27]     ✓ ~/.bash_history cleared[0m
+[0;32m[22:06:27] ✓ History cleanup complete[0m
+[0;35m[22:06:27] ======== ATTACK COMPLETE ========[0m
+[0;32m[22:06:27] Telemetry stored: /dev/shm/.../...HIDDEN.../[0m
+[0;32m[22:06:27] Attack simulation report: /dev/shm/.../...HIDDEN.../report.json[0m

@@ -1,41 +1,35 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
   name: payload-server
-  namespace: default
+  namespace: bilal
+  labels:
+    app: payload-server
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: payload-server
-  template:
-    metadata:
-      labels:
-        app: payload-server
-    spec:
-      containers:
-      - name: payload-server
-        image: bilals12/payload-server:latest
-        env:
-        - name: ATTACK_DEBUG
-          value: "0"
-        - name: HTTP_PORT
-          value: "8080"
-        - name: SHELL_PORT_1
-          value: "4444"
-        - name: SHELL_PORT_2
-          value: "7456"
-        ports:
-        - containerPort: 8080
-        - containerPort: 4444
-        - containerPort: 7456
-        - containerPort: 4445
+  containers:
+  - name: payload-server
+    image: bilals12/payload-server@sha256:09f1313653b435b4402aafa2778440ef090be3f1509a974aeb7e6b0659c05441
+    imagePullPolicy: Always
+    env:
+    - name: ATTACK_DEBUG
+      value: "0"
+    - name: HTTP_PORT
+      value: "8080"
+    - name: SHELL_PORT_1
+      value: "4444"
+    - name: SHELL_PORT_2
+      value: "7456"
+    ports:
+    - containerPort: 8080
+    - containerPort: 4444
+    - containerPort: 7456
+    - containerPort: 4445
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: payload-server
-  namespace: default
+  namespace: bilal
 spec:
   selector:
     app: payload-server
