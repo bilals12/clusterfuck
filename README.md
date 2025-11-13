@@ -1,217 +1,268 @@
-# clusterfuck AKA kast
-
-an attack environment for simulating realistic attack vectors against Kubernetes clusters to validate security controls and defenses.
+# clusterfuck
 
 ![Kubernetes Attack Simulation](https://img.shields.io/badge/Kubernetes-Attack_Simulation-red)
 ![Security Testing](https://img.shields.io/badge/Security-Testing-blue)
 ![Purple Team](https://img.shields.io/badge/Purple-Team-purple)
 
-# overview
+A Kubernetes attack simulation framework for testing security monitoring and detection capabilities. This toolkit deploys realistic post-exploitation techniques within containerized environments to validate whether security controls will detect real attacks.
 
-clusterfuck simulates advanced container escape and privilege escalation techniques commonly used by attackers targeting Kubernetes environments. The toolkit allows security teams to:
+## purpose
 
-- evaluate effectiveness of security controls
-- validate detection capabilities
-- test incident response procedures
-- conduct purple team exercises
+This framework simulates attack patterns observed in actual Kubernetes compromises, including container escapes, credential theft, cryptomining, data exfiltration, and command-and-control communications. Security teams use it to:
 
-# key features
+- Test detection coverage for container-based attacks
+- Validate CSPM, EDR, and SIEM alert configurations
+- Measure incident response effectiveness
+- Conduct purple team exercises with realistic attack scenarios
 
-- **container dscape techniques**: eimulates privileged container attacks with host filesystem access
-- **credential exfiltration**: extracts and exfiltrates Kubernetes service account tokens
-- **network reconnaissance**: performs port scanning and network mapping 
-- **persistence mechanisms**: demonstrates common persistence techniques including cron jobs
-- **command & control**: establishes reverse shell connections to a simulated C2 server
-- **payload delivery**: includes a full payload server for realistic attack simulation
-- **cloud credential theft**: simulates AWS credential theft (with dummy or real credentials)
-- **process hiding**: demonstrates anti-forensics techniques
+# attack capabilities
+
+- **Container escape**: Executes privileged container attacks with host filesystem mounting and namespace manipulation
+- **Credential exfiltration**: Extracts Kubernetes service account tokens and AWS credentials from mounted secrets
+- **Network reconnaissance**: Performs concurrent port scanning and cluster network mapping
+- **Persistence mechanisms**: Installs cron-based persistence and demonstrates common backdoor techniques
+- **Command & control**: Establishes reverse shell connections to a simulated C2 infrastructure
+- **Data exfiltration**: Transfers stolen credentials and sensitive files over HTTP
+- **Cryptomining**: Deploys XMRig miner with process hiding via LD_PRELOAD manipulation
+- **Defense evasion**: Uses eBPF-based rootkits and anti-forensics techniques to evade detection
 
 # prerequisites
 
-- kubernetes cluster (minikube, kind, EKS, GKE, etc.)
-- `kubectl` configured with appropriate permissions
-- basic understanding of Kubernetes security concepts
+- Kubernetes cluster (local: minikube/kind, cloud: EKS/GKE/AKS)
+- `kubectl` configured with cluster-admin permissions
+- Docker for building container images
+- Understanding of Kubernetes security primitives and common attack vectors
 
-# quick start
+# deployment
 
-## build images
+## build container images
 
 ```bash
-# package attack sim payloads
+# Package attack simulation payloads
 tar -cf sim.tar dropper.sh run.sh exfil.py portscan.py
 
-# build attack simulation image
+# Build and push attack simulation container
 docker build -f Dockerfile.sim -t bilals12/attack-sim:latest .
 docker push bilals12/attack-sim:latest
 
-# build payload server image
+# Build and push C2 payload server
 docker build -f Dockerfile.payload -t bilals12/payload-server:latest .
 docker push bilals12/payload-server:latest
 ```
 
-## deploy
+## deploy to cluster
 
-minimal setup (no AWS credential theft demo):
+Basic deployment without AWS credential theft simulation:
+
 ```bash
-# deploy payload server (C2)
+# Deploy C2 payload server
 kubectl apply -f payload-server.yaml
 
-# deploy attack simulation
+# Deploy attack simulation pod
 kubectl apply -f attack-sim-deploy.yaml
 
-# monitor execution
+# Stream attack execution logs
 kubectl logs -f sim-pod
 ```
 
-advanced setup (includes AWS credential theft):
+Full deployment including AWS credential theft:
+
 ```bash
-# create AWS credentials secret
+# Create AWS credentials secret (uses dummy credentials by default)
 kubectl apply -f aws-credentials.yaml
 
-# deploy infrastructure
+# Deploy complete attack infrastructure
 kubectl apply -f payload-server.yaml
 kubectl apply -f attack-sim-deploy.yaml
 
-# monitor logs
+# Monitor attack progression
 kubectl logs -f sim-pod
 ```
 
-## monitor results
+## observe attack telemetry
 
 ```bash
-# view attack telemetry report
+# View attack execution report with timestamps and results
 kubectl exec sim-pod -- cat /dev/shm/.../...HIDDEN.../report.json
 
-# view payload server logs (exfiltration events)
+# Monitor C2 server logs for exfiltration events
 kubectl logs -f $(kubectl get pods -l app=payload-server -o name | head -n1)
 
-# list exfiltrated files
+# List files exfiltrated to C2 server
 kubectl exec $(kubectl get pods -l app=payload-server -o name | head -n1) -- ls -la /payloads/uploads
 ```
 
 # configuration
 
-environment variables in [attack-sim-deploy.yaml](attack-sim-deploy.yaml):
+## attack simulation parameters
+
+Configure these environment variables in [attack-sim-deploy.yaml](attack-sim-deploy.yaml):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PAYLOAD_SERVER` | `payload-server.default.svc.cluster.local` | C2 server hostname |
-| `PAYLOAD_PORT` | `8080` | C2 server port |
-| `MINER_DURATION` | `60` | Cryptominer runtime (seconds) |
-| `AWS_CREDENTIAL_PATH` | `/etc/bsssq-secrets/aws` | AWS credentials mount path |
+| `PAYLOAD_SERVER` | `payload-server.default.svc.cluster.local` | C2 server hostname (cluster DNS) |
+| `PAYLOAD_PORT` | `8080` | C2 server listening port |
+| `MINER_DURATION` | `60` | Cryptominer execution time in seconds |
+| `AWS_CREDENTIAL_PATH` | `/etc/bsssq-secrets/aws` | Path to mounted AWS credentials secret |
 
-environment variables in [payload-server.yaml](payload-server.yaml):
+## C2 server parameters
+
+Configure these environment variables in [payload-server.yaml](payload-server.yaml):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ATTACK_DEBUG` | `0` | Set to `1` for verbose logging |
+| `ATTACK_DEBUG` | `0` | Enable verbose logging (`1` for debug output) |
 
 # architecture
 
-## components
+## system components
 
-1. **attack-sim**: privileged pod executing attack techniques in parallel
-2. **payload-server**: C2 server collecting exfiltration data and providing reverse shells
+1. **attack-sim**: Privileged pod that executes attack techniques in parallel using bash orchestration
+2. **payload-server**: HTTP-based C2 server that receives exfiltrated data and serves reverse shell payloads
 
-## attack stages
+## attack execution flow
 
-| Stage | Technique | Expected Detection |
-|-------|-----------|-------------------|
-| **Credential Theft** | K8s service account token extraction | File access on sensitive paths |
-| **Process Hiding** | LD_PRELOAD + eBPF rootkit (www) | Suspicious library loading |
-| **Container Escape** | Mount syscall manipulation, cgroup attacks | Privileged syscall usage |
-| **Cryptomining** | XMRig execution (hidden via LD_PRELOAD) | High CPU, network to mining pool |
-| **Port Scanning** | Concurrent TCP probes | Network reconnaissance activity |
-| **Credential Sweep** | AWS credentials, kubeconfig, SSH keys | File enumeration patterns |
-| **Data Exfiltration** | HTTP POST to C2 server | Outbound connections with file data |
-| **Reverse Shells** | Multiple C2 connection methods | Unexpected outbound shells |
+| Stage | Technique | Detection Signature |
+|-------|-----------|---------------------|
+| **Credential Theft** | Extract Kubernetes service account JWT tokens | File read on `/var/run/secrets/kubernetes.io/serviceaccount/token` |
+| **Process Hiding** | LD_PRELOAD manipulation + eBPF rootkit deployment | Suspicious shared library injection, eBPF program loading |
+| **Container Escape** | Host filesystem mounting, cgroup manipulation | Privileged container syscalls, sensitive host path access |
+| **Cryptomining** | XMRig miner with LD_PRELOAD-based hiding | Elevated CPU usage, connections to mining pools |
+| **Port Scanning** | Concurrent TCP connection attempts across port ranges | Rapid connection attempts to multiple ports |
+| **Credential Sweep** | Search for AWS credentials, kubeconfigs, SSH keys | File enumeration in sensitive directories |
+| **Data Exfiltration** | HTTP POST of stolen files to C2 infrastructure | Outbound HTTP with authentication data payloads |
+| **Reverse Shells** | Establish persistent C2 channels | Unexpected reverse TCP connections |
 
-## files
+## file structure
 
 | File | Purpose |
 |------|---------|
-| [dropper.sh](dropper.sh) | Initial payload downloader with validation (25 lines) |
-| [run.sh](run.sh) | Main attack orchestration with parallel execution (161 lines) |
-| [exfil.py](exfil.py) | Reusable exfiltration helper with retry logic (47 lines) |
-| [portscan.py](portscan.py) | Concurrent port scanner (30 lines) |
-| [Dockerfile.sim](Dockerfile.sim) | Attack container image definition (34 lines) |
-| [Dockerfile.payload](Dockerfile.payload) | C2 server image with silent mode (120 lines) |
-| [attack-sim-deploy.yaml](attack-sim-deploy.yaml) | Attack pod manifest with misconfigurations (77 lines) |
-| [payload-server.yaml](payload-server.yaml) | C2 server deployment (55 lines) |
-| [aws-credentials.yaml](aws-credentials.yaml) | Plain K8s secret with dummy AWS credentials |
-| [sealed-aws-credentials.yaml](sealed-aws-credentials.yaml) | SealedSecret template (requires cluster sealing key) |
+| [dropper.sh](dropper.sh) | Stage-1 payload downloader with checksum validation |
+| [run.sh](run.sh) | Main attack orchestrator executing techniques in parallel |
+| [exfil.py](exfil.py) | HTTP-based exfiltration utility with retry logic |
+| [portscan.py](portscan.py) | Multi-threaded TCP port scanner |
+| [Dockerfile.sim](Dockerfile.sim) | Attack simulation container image build definition |
+| [Dockerfile.payload](Dockerfile.payload) | C2 server container image with Flask-based HTTP server |
+| [attack-sim-deploy.yaml](attack-sim-deploy.yaml) | Kubernetes pod manifest with intentionally insecure configurations |
+| [payload-server.yaml](payload-server.yaml) | C2 server deployment and service definitions |
+| [aws-credentials.yaml](aws-credentials.yaml) | Kubernetes secret containing dummy AWS credentials |
+| [sealed-aws-credentials.yaml](sealed-aws-credentials.yaml) | SealedSecret version requiring cluster-specific sealing key |
 
-# expected wiz detections
+# detection validation
 
-when running in a Wiz-monitored cluster, expect these findings:
+This framework generates telemetry for testing security monitoring platforms. When deployed in a Wiz-monitored cluster, expect the following detection alerts:
 
-| Finding Type | Technique | Wiz Rule |
-|--------------|-----------|----------|
-| Container Escape | Privileged container + host mounts | Privileged container with sensitive host path mounts |
-| Credential Access | Service account token read | Suspicious file access to K8s token path |
-| Defense Evasion | LD_PRELOAD manipulation | Suspicious LD_PRELOAD usage |
-| Cryptomining | XMRig execution | Cryptominer detected (XMRig) |
-| Network Scan | Port enumeration | Port scanning activity detected |
-| Exfiltration | HTTP POST with stolen data | Data exfiltration via HTTP |
-| C2 Communication | Reverse shell connections | Reverse shell connection detected |
-| Process Injection | eBPF rootkit (www binary) | eBPF program loaded |
+| Attack Category | Simulated Technique | Expected Wiz Detection Rule |
+|-----------------|---------------------|----------------------------|
+| Container Escape | Privileged container with host path mounts | Privileged container with sensitive host path mounts |
+| Credential Access | Kubernetes service account token extraction | Suspicious file access to service account token path |
+| Defense Evasion | LD_PRELOAD shared library injection | Suspicious LD_PRELOAD environment variable usage |
+| Cryptomining | XMRig cryptocurrency miner execution | Cryptominer process detected (XMRig signature) |
+| Discovery | TCP port scanning across IP ranges | Port scanning activity from container |
+| Exfiltration | HTTP exfiltration of credentials | Outbound data transfer with sensitive content |
+| Command & Control | Reverse shell establishment | Reverse shell connection initiated |
+| Persistence | eBPF-based rootkit loading | eBPF program loaded in container |
 
 # security notice
 
-⚠️ **DEFENSIVE USE ONLY**: this toolkit is for validating CSPM/EDR detection capabilities in controlled environments you own or have explicit permission to test.
+**This toolkit is designed exclusively for authorized security testing in controlled environments.**
 
-**Contains**:
-- Privileged container configurations (deliberate misconfigurations)
-- Dummy AWS credentials (no real cloud access)
-- Attack simulation binaries (xmx2, www, noumt, pt)
+## intended use
 
-**DO NOT**:
-- Use in production environments
-- Deploy without security monitoring
-- Modify for malicious purposes
+- Purple team exercises in dedicated test clusters
+- Security control validation with proper authorization
+- Detection engineering and threat hunting development
+- Incident response training scenarios
+
+## scope limitations
+
+This framework includes:
+- Intentionally misconfigured privileged containers
+- Simulated attack binaries (xmx2, www, noumt, pt)
+- Dummy AWS credentials with no real cloud access
+- C2 infrastructure for controlled exfiltration testing
+
+## restrictions
+
+- Only deploy in non-production, isolated test environments
+- Require explicit authorization before deployment
+- Do not modify for unauthorized security testing
+- Ensure security monitoring is active during testing
 
 # cleanup
 
+Remove all attack simulation components from the cluster:
+
 ```bash
-# remove attack simulation
+# Delete attack simulation pod
 kubectl delete -f attack-sim-deploy.yaml
 
-# remove payload server
+# Delete C2 payload server
 kubectl delete -f payload-server.yaml
 
-# remove secrets
+# Delete credential secrets
 kubectl delete secret aws-credentials --ignore-not-found
 kubectl delete sealedsecret aws-credentials --ignore-not-found
 
-# verify cleanup
+# Verify complete removal
 kubectl get pods -l app=attack-sim
 kubectl get pods -l app=payload-server
 ```
 
 # troubleshooting
 
-**Issue**: dropper.sh fails with "Server unreachable"
-- **Fix**: verify payload-server is running: `kubectl get pods -l app=payload-server`
+## payload server connection failures
 
-**Issue**: no exfiltration data captured
-- **Fix**: check NetworkPolicy allows egress: `kubectl describe netpol allow-payload-access`
+**Symptom**: dropper.sh reports "Server unreachable" or connection timeout
 
-**Issue**: miner not detected by Wiz
-- **Fix**: increase `MINER_DURATION` to 120s in attack-sim-deploy.yaml
+**Resolution**:
+```bash
+# Verify payload server pod is running
+kubectl get pods -l app=payload-server
 
-**Issue**: sealed secret decryption fails
-- **Fix**: regenerate with cluster's sealing key (see sealed-aws-credentials.yaml)
+# Check service DNS resolution
+kubectl exec sim-pod -- nslookup payload-server.default.svc.cluster.local
+```
 
-# performance
+## missing exfiltration data
 
-refactoring results from 844-line monolithic run.sh:
+**Symptom**: No data appears in C2 server uploads directory
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Total runtime | ~67s | ~35s | 48% faster |
-| Code size (run.sh) | 844 lines | 161 lines | 81% reduction |
-| Port scan duration | 12-20s | 2s | 6x faster |
-| Parallel execution | No | Yes | Better detection coverage |
+**Resolution**:
+```bash
+# Verify NetworkPolicy allows egress to payload server
+kubectl describe netpol allow-payload-access
+
+# Check C2 server logs for connection attempts
+kubectl logs -l app=payload-server
+```
+
+## cryptominer not detected
+
+**Symptom**: Security monitoring does not alert on XMRig execution
+
+**Resolution**: Increase miner execution time to allow detection rules to trigger:
+- Edit `MINER_DURATION` to `120` in attack-sim-deploy.yaml
+- Redeploy simulation pod
+
+## sealed secret decryption errors
+
+**Symptom**: SealedSecret fails to decrypt in target cluster
+
+**Resolution**: Regenerate sealed secret using the target cluster's sealing key (see sealed-aws-credentials.yaml for template)
+
+# performance metrics
+
+Results from refactoring the original 844-line monolithic attack script:
+
+| Metric | Original | Optimized | Improvement |
+|--------|----------|-----------|-------------|
+| Total execution time | ~67 seconds | ~35 seconds | 48% faster |
+| Main script size | 844 lines | 161 lines | 81% reduction |
+| Port scan duration | 12-20 seconds | 2 seconds | 6x faster |
+| Attack parallelization | Sequential | Concurrent | Improved detection coverage |
+
+The refactored architecture executes multiple attack techniques simultaneously, reducing overall runtime while generating more realistic attack patterns for detection testing.
 
 # license
 
